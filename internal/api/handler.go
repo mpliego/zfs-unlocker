@@ -9,7 +9,6 @@ import (
 
 	"zfs-unlocker/internal/approval"
 	"zfs-unlocker/internal/config"
-	"zfs-unlocker/internal/telegram"
 	"zfs-unlocker/internal/vault"
 
 	"github.com/gin-gonic/gin"
@@ -20,14 +19,18 @@ type ClientRule struct {
 	PathPrefix  string
 }
 
+type Notifier interface {
+	RequestApproval(reqID, description string) error
+}
+
 type Handler struct {
 	approvalService *approval.Service
 	vaultClient     vault.Client
-	bot             *telegram.Bot
+	bot             Notifier
 	clientRules     map[string]*ClientRule
 }
 
-func New(apiKeys []config.APIKey, approvalSvc *approval.Service, vaultClient vault.Client, bot *telegram.Bot) *Handler {
+func New(apiKeys []config.APIKey, approvalSvc *approval.Service, vaultClient vault.Client, bot Notifier) *Handler {
 	rules := make(map[string]*ClientRule)
 
 	for _, k := range apiKeys {
