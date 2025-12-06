@@ -10,7 +10,7 @@ import (
 )
 
 type Client interface {
-	GetSecret(ctx context.Context) (map[string]interface{}, error)
+	GetSecret(ctx context.Context, keyPrefix, volumeID string) (map[string]interface{}, error)
 }
 
 type VaultClient struct {
@@ -21,6 +21,7 @@ type VaultClient struct {
 
 func New(cfg config.VaultConfig) (*VaultClient, error) {
 	vConfig := hashivault.DefaultConfig()
+
 	vConfig.Address = cfg.Address
 
 	client, err := hashivault.NewClient(vConfig)
@@ -43,19 +44,24 @@ func New(cfg config.VaultConfig) (*VaultClient, error) {
 	}, nil
 }
 
-func (v *VaultClient) GetSecret(ctx context.Context) (map[string]interface{}, error) {
-	// Access KV v2
-	// The path for KV v2 reads usually involves "data" - SDK handles some,
-	// but using logical read on mountPath/data/secretPath is standard for KV2 key reading.
-	// NOTE: standard client.KVv2 call is preferred for abstraction.
+func (v *VaultClient) GetSecret(ctx context.Context, keyPrefix, volumeID string) (map[string]interface{}, error) {
+	// Path construction: {vault-config-prefix}/{api-key-config-prefix}/{volume-id}
+	// e.g. secret/data/my-secret/key-prefix/volume-id
+	// Note: KVv2 Get argument is relative to the mount.
+	// If mount is "secret", and we want "secret/data/foo/bar", we ask for "foo/bar".
 
-	secret, err := v.client.KVv2(v.mountPath).Get(ctx, v.secretPath)
+	// Assuming v.secretPath is the "vault-config-prefix" (base path)
+	fullPath := fmt.Sprintf("%s/%s/%s", v.secretPath, keyPrefix, volumeID)
+	// Clean up double slashes if any prefix is empty
+	// (Simple string manip or path.Join, but path.Join might mess with URL schemes if any, keeping simple for now)
+
+	secret, err := v.client.KVv2(v.mountPath).Get(ctx, fullPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read secret: %w", err)
+		return nil, fmt.Errorf("unable to read secret at %s: %w", fullPath, err)
 	}
 
 	if secret == nil {
-		return nil, fmt.Errorf("secret not found at %s/%s", v.mountPath, v.secretPath)
+		return nil, fmt.Errorf("secret not found at %s/%s", v.mountPath, fullPath)
 	}
 
 	return secret.Data, nil

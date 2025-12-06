@@ -1,55 +1,125 @@
 package api
 
 import (
+	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"zfs-unlocker/internal/approval"
+	"zfs-unlocker/internal/config"
 	"zfs-unlocker/internal/telegram"
 	"zfs-unlocker/internal/vault"
+
+	"github.com/gin-gonic/gin"
 )
+
+type ClientRule struct {
+	AllowedNets []*net.IPNet
+	PathPrefix  string
+}
 
 type Handler struct {
 	approvalService *approval.Service
-	vaultClient     vault.Client // Use interface
+	vaultClient     vault.Client
 	bot             *telegram.Bot
-	apiKeys         map[string]bool
+	clientRules     map[string]*ClientRule
 }
 
-func New(validKeys []string, approvalSvc *approval.Service, vaultClient vault.Client, bot *telegram.Bot) *Handler {
-	keys := make(map[string]bool)
-	for _, k := range validKeys {
-		keys[k] = true
+func New(apiKeys []config.APIKey, approvalSvc *approval.Service, vaultClient vault.Client, bot *telegram.Bot) *Handler {
+	rules := make(map[string]*ClientRule)
+
+	for _, k := range apiKeys {
+		rule := &ClientRule{
+			PathPrefix: k.PathPrefix,
+		}
+		if len(k.AllowedCIDRs) > 0 {
+			for _, cidr := range k.AllowedCIDRs {
+				_, network, err := net.ParseCIDR(cidr)
+				if err != nil {
+					log.Printf("Warning: Invalid CIDR %s for API key %s: %v", cidr, k.Key, err)
+					continue
+				}
+				rule.AllowedNets = append(rule.AllowedNets, network)
+			}
+		}
+		rules[k.Key] = rule
 	}
 
 	return &Handler{
 		approvalService: approvalSvc,
 		vaultClient:     vaultClient,
 		bot:             bot,
-		apiKeys:         keys,
+		clientRules:     rules,
 	}
 }
 
 func (h *Handler) RegisterRoutes(r *gin.Engine) {
-	r.POST("/unlock", h.authMiddleware, h.handleUnlock)
+	// Route: /unlock/:apiKey/:volumeID
+	r.GET("/unlock/:apiKey/:volumeID", h.authMiddleware, h.handleUnlock)
+	r.POST("/unlock/:apiKey/:volumeID", h.authMiddleware, h.handleUnlock)
 }
 
 func (h *Handler) authMiddleware(c *gin.Context) {
-	apiKey := c.GetHeader("X-API-Key")
-	if !h.apiKeys[apiKey] {
+	apiKey := c.Param("apiKey")
+	if apiKey == "" {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing key parameter"})
+		return
+	}
+
+	rule, exists := h.clientRules[apiKey]
+	if !exists {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
+
+	// Check IP restrictions
+	if len(rule.AllowedNets) > 0 {
+		clientIPStr := c.ClientIP()
+		clientIP := net.ParseIP(clientIPStr)
+
+		if clientIP == nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Invalid IP"})
+			return
+		}
+
+		allowed := false
+		for _, network := range rule.AllowedNets {
+			if network.Contains(clientIP) {
+				allowed = true
+				break
+			}
+		}
+
+		if !allowed {
+			log.Printf("Access denied for key %s from IP %s", apiKey, clientIPStr)
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "IP not allowed"})
+			return
+		}
+	}
+
+	// Store rule info in context for the handler
+	c.Set("clientRule", rule)
 	c.Next()
 }
 
 func (h *Handler) handleUnlock(c *gin.Context) {
+	ruleObj, _ := c.Get("clientRule")
+	rule := ruleObj.(*ClientRule)
+
+	volumeID := c.Param("volumeID")
+	if volumeID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing volume ID"})
+		return
+	}
+
 	// 1. Create request
 	reqID, waitChan := h.approvalService.NewRequest()
 
 	// 2. Notify via Telegram
-	err := h.bot.RequestApproval(reqID, "Request to unlock ZFS dataset")
+	msg := fmt.Sprintf("Request to unlock volume: `%s`", volumeID)
+	err := h.bot.RequestApproval(reqID, msg)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send approval request"})
 		h.approvalService.ResolveRequest(reqID, false) // cleanup
@@ -61,11 +131,16 @@ func (h *Handler) handleUnlock(c *gin.Context) {
 	case approved := <-waitChan:
 		if approved {
 			// Retrieve secret from Vault
-			secret, err := h.vaultClient.GetSecret(c.Request.Context())
+			// Uses stored PathPrefix from config and extracted VolumeID
+			secret, err := h.vaultClient.GetSecret(c.Request.Context(), rule.PathPrefix, volumeID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Approved, but failed to fetch secret", "details": err.Error()})
+				log.Printf("Vault fetch failed: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Approved, but failed to fetch secret"})
 				return
 			}
+
+			// If the secret data has a "key" field or "value" field, we may want to return that directly?
+			// But sticking to JSON return of the map for now as previously implemented.
 			c.JSON(http.StatusOK, gin.H{"status": "approved", "secret": secret})
 		} else {
 			c.JSON(http.StatusForbidden, gin.H{"status": "denied"})

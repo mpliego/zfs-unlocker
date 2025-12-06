@@ -10,7 +10,13 @@ import (
 type Config struct {
 	Vault    VaultConfig    `yaml:"vault"`
 	Telegram TelegramConfig `yaml:"telegram"`
-	ApiKeys  []string       `yaml:"api_keys"`
+	ApiKeys  []APIKey       `yaml:"api_keys"`
+}
+
+type APIKey struct {
+	Key          string   `yaml:"key"`
+	PathPrefix   string   `yaml:"path_prefix"`
+	AllowedCIDRs []string `yaml:"allowed_cidrs"`
 }
 
 type VaultConfig struct {
