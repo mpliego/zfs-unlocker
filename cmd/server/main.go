@@ -1,17 +1,36 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
+	"os"
 
-	"github.com/gin-gonic/gin"
 	"zfs-unlocker/internal/api"
 	"zfs-unlocker/internal/approval"
 	"zfs-unlocker/internal/config"
 	"zfs-unlocker/internal/telegram"
 	"zfs-unlocker/internal/vault"
+
+	"github.com/gin-gonic/gin"
+)
+
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
 )
 
 func main() {
+	// Parse flags manually or using flag package.
+	versionFlag := flag.Bool("version", false, "Print version information")
+	vFlag := flag.Bool("v", false, "Print version information")
+	flag.Parse()
+
+	if *versionFlag || *vFlag {
+		fmt.Printf("zfs-unlocker %s\n", version)
+		os.Exit(0)
+	}
 	// 1. Load Config
 	cfg, err := config.Load("config.yaml")
 	if err != nil {

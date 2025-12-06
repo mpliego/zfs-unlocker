@@ -18,6 +18,11 @@ builds:
       - arm64
     main: ./cmd/server
     binary: zfs-unlocker
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
 
 archives:
   - id: default
