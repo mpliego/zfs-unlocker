@@ -25,6 +25,7 @@ func main() {
 	// Parse flags manually or using flag package.
 	versionFlag := flag.Bool("version", false, "Print version information")
 	vFlag := flag.Bool("v", false, "Print version information")
+	configPath := flag.String("config", "config.yaml", "Path to configuration file")
 	flag.Parse()
 
 	if *versionFlag || *vFlag {
@@ -32,7 +33,7 @@ func main() {
 		os.Exit(0)
 	}
 	// 1. Load Config
-	cfg, err := config.Load("config.yaml")
+	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
