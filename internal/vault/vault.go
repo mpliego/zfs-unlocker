@@ -29,7 +29,10 @@ func New(cfg config.VaultConfig) (*VaultClient, error) {
 		return nil, fmt.Errorf("unable to initialize Vault client: %w", err)
 	}
 
-	client.SetToken(cfg.Token)
+	// Prioritize config file token, fallback to standard VAULT_TOKEN env var
+	if cfg.Token != "" {
+		client.SetToken(cfg.Token)
+	}
 
 	// Verify connection/token (optional, but good practice)
 	// _, err = client.Auth().Token().LookupSelf()

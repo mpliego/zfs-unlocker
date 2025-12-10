@@ -1,0 +1,16 @@
+meta {
+  name: Unlock Volume (Get Key)
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://localhost:8080/unlock/:apiKey/:volumeId
+  body: none
+  auth: none
+}
+
+params:path {
+  apiKey: test-api-key
+  volumeId: my-volume-id-01
+}

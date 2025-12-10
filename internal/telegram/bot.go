@@ -3,11 +3,13 @@ package telegram
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"zfs-unlocker/internal/approval"
 	"zfs-unlocker/internal/config"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type Bot struct {
@@ -17,7 +19,12 @@ type Bot struct {
 }
 
 func New(cfg config.TelegramConfig, approvalService *approval.Service) (*Bot, error) {
-	bot, err := tgbotapi.NewBotAPI(cfg.BotToken)
+	token := cfg.BotToken
+	if token == "" {
+		token = os.Getenv("TELEGRAM_BOT_TOKEN")
+	}
+
+	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bot: %w", err)
 	}

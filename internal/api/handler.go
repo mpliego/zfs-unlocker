@@ -142,8 +142,13 @@ func (h *Handler) handleUnlock(c *gin.Context) {
 				return
 			}
 
-			// If the secret data has a "key" field or "value" field, we may want to return that directly?
-			// But sticking to JSON return of the map for now as previously implemented.
+			// ZFS Compatibility: Return raw text found in standard fields
+			if val, ok := secret["key"]; ok {
+				c.String(http.StatusOK, fmt.Sprintf("%v", val))
+				return
+			}
+
+			// Fallback: If we can't find a single key, return JSON (useful for debugging)
 			c.JSON(http.StatusOK, gin.H{"status": "approved", "secret": secret})
 		} else {
 			c.JSON(http.StatusForbidden, gin.H{"status": "denied"})
