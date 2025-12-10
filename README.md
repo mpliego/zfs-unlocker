@@ -33,13 +33,13 @@ Create a `config.yaml` file in the working directory:
 ```yaml
 vault:
   address: "http://127.0.0.1:8200"
-  token: "hvs.your-vault-token"
   mount_path: "secret"       # The KV-v2 mount point
   secret_path: "zfs-keys"    # The base path for keys
+  # token: "..."             # Optional: Can be set via VAULT_TOKEN env var
 
 telegram:
-  bot_token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
   chat_id: 123456789
+  # bot_token: "..."         # Optional: Can be set via TELEGRAM_BOT_TOKEN env var
 
 api_keys:
   - key: "server-01-api-key"
@@ -52,6 +52,11 @@ api_keys:
       - "10.0.0.0/8"
 ```
 
+### Environment Variables
+For better security, you can provide secrets via environment variables instead of the config file:
+*   `VAULT_TOKEN`: Authentication token for HashiCorp Vault.
+*   `TELEGRAM_BOT_TOKEN`: The API token for your Telegram Bot.
+
 ## Usage
 
 ### 1. Run the Server
@@ -59,8 +64,14 @@ api_keys:
 # Build
 go build -o zfs-unlocker ./cmd/server
 
-# Run
+# Run with default config (config.yaml)
 ./zfs-unlocker
+
+# Run with custom config
+./zfs-unlocker --config /etc/zfs-unlocker/production.yaml
+
+# Check Version
+./zfs-unlocker --version
 ```
 
 ### 2. Client Request (Example)
@@ -81,13 +92,12 @@ Based on the config above, this will attempt to fetch the secret from Vault at:
 *   **volumeID**: The identifier for the volume (used to find the key in Vault).
 
 **Response (Success 200)**
-```json
-{
-  "status": "approved",
-  "secret": {
-    "value": "super-secret-key-material"
-  }
-}
+
+*   **Raw Text**: If the secret contains a field named `value`, `key`, or `password`, the API returns just the content of that field as plain text. This is designed for direct consumption by `zfs load-key`.
+*   **JSON**: If no standard key field is found, it falls back to returning the full secret JSON object.
+
+```text
+MySuperSecretPassword
 ```
 
 **Response (Pending)**
