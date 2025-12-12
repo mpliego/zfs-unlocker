@@ -10,7 +10,12 @@ import (
 type Config struct {
 	Vault    VaultConfig    `yaml:"vault"`
 	Telegram TelegramConfig `yaml:"telegram"`
+	Server   ServerConfig   `yaml:"server"`
 	ApiKeys  []APIKey       `yaml:"api_keys"`
+}
+
+type ServerConfig struct {
+	ListenAddress string `yaml:"listen_address"`
 }
 
 type APIKey struct {

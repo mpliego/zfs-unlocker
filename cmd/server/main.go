@@ -62,8 +62,12 @@ func main() {
 	apiHandler.RegisterRoutes(r)
 
 	// 7. Run Server
-	log.Println("Starting server on :8080")
-	if err := r.Run(":8080"); err != nil {
+	addr := cfg.Server.ListenAddress
+	if addr == "" {
+		addr = ":8080"
+	}
+	log.Printf("Starting server on %s", addr)
+	if err := r.Run(addr); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
