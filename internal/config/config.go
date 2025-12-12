@@ -16,6 +16,8 @@ type Config struct {
 
 type ServerConfig struct {
 	ListenAddress string `yaml:"listen_address"`
+	CertFile      string `yaml:"cert_file"`
+	KeyFile       string `yaml:"key_file"`
 }
 
 type APIKey struct {

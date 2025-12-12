@@ -31,6 +31,11 @@ ZFS Unlocker is a secure, modular microservice designed to facilitate the remote
 Create a `config.yaml` file in the working directory:
 
 ```yaml
+server:
+  listen_address: ":8080"    # Optional: Defaults to :8080
+  # cert_file: "server.crt"  # Optional: Enable TLS
+  # key_file: "server.key"   # Optional: Enable TLS
+
 vault:
   address: "http://127.0.0.1:8200"
   mount_path: "secret"       # The KV-v2 mount point
@@ -71,7 +76,7 @@ go build -o zfs-unlocker ./cmd/server
 ./zfs-unlocker --config /etc/zfs-unlocker/production.yaml
 
 # Check Version
-./zfs-unlocker --version
+./zfs-unlocker version
 ```
 
 ### 2. Client Request (Example)

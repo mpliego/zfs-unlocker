@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -118,12 +117,9 @@ func TestHandler_Unlock_Success(t *testing.T) {
 		t.Errorf("Expected 200 OK, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &resp)
-
-	secret := resp["secret"].(map[string]interface{})
-	if secret["key"] != "top-secret-zfs-key" {
-		t.Errorf("Expected secret 'top-secret-zfs-key', got %v", secret["key"])
+	// The handler returns a plain string if "key" field exists in the secret
+	if w.Body.String() != "top-secret-zfs-key" {
+		t.Errorf("Expected body 'top-secret-zfs-key', got '%s'", w.Body.String())
 	}
 }
 

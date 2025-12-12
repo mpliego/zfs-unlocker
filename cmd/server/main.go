@@ -67,7 +67,14 @@ func main() {
 		addr = ":8080"
 	}
 	log.Printf("Starting server on %s", addr)
-	if err := r.Run(addr); err != nil {
-		log.Fatalf("Server failed: %v", err)
+
+	if cfg.Server.CertFile != "" && cfg.Server.KeyFile != "" {
+		if err := r.RunTLS(addr, cfg.Server.CertFile, cfg.Server.KeyFile); err != nil {
+			log.Fatalf("Server failed to start (TLS): %v", err)
+		}
+	} else {
+		if err := r.Run(addr); err != nil {
+			log.Fatalf("Server failed: %v", err)
+		}
 	}
 }
