@@ -68,7 +68,8 @@ func TestHandler_Unlock_Success(t *testing.T) {
 	approvalSvc := approval.New()
 	mockBot := &MockNotifier{}
 	mockVault := &MockVault{
-		SecretToReturn: map[string]interface{}{"key": "top-secret-zfs-key"},
+		// Base64 for "top-secret-zfs-key" is "dG9wLXNlY3JldC16ZnMta2V5"
+		SecretToReturn: map[string]interface{}{"key": "dG9wLXNlY3JldC16ZnMta2V5"},
 	}
 
 	keys := []config.APIKey{
@@ -117,7 +118,7 @@ func TestHandler_Unlock_Success(t *testing.T) {
 		t.Errorf("Expected 200 OK, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	// The handler returns a plain string if "key" field exists in the secret
+	// The handler returns raw bytes (decoded from Base64)
 	if w.Body.String() != "top-secret-zfs-key" {
 		t.Errorf("Expected body 'top-secret-zfs-key', got '%s'", w.Body.String())
 	}
@@ -158,5 +159,40 @@ func TestHandler_Unlock_Deny(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("Expected 403 Forbidden, got %d", w.Code)
+	}
+}
+
+func TestHandler_Unlock_AlwaysRaw(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	approvalSvc := approval.New()
+	mockBot := &MockNotifier{}
+	// Base64 for "hello" is "aGVsbG8="
+	mockVault := &MockVault{
+		SecretToReturn: map[string]interface{}{"key": "aGVsbG8="},
+	}
+	keys := []config.APIKey{{Key: "test-key"}}
+	handler := New(keys, approvalSvc, mockVault, mockBot)
+
+	r := gin.New()
+	handler.RegisterRoutes(r)
+	done := make(chan bool)
+	w := httptest.NewRecorder()
+
+	go func() {
+		// No query param needed, should default to raw decoding
+		req, _ := http.NewRequest("GET", "/unlock/test-key/vol-raw", nil)
+		r.ServeHTTP(w, req)
+		close(done)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	approvalSvc.ResolveRequest(mockBot.CapturedReqID, true)
+	<-done
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected 200 OK, got %d", w.Code)
+	}
+	if w.Body.String() != "hello" {
+		t.Errorf("Expected decoded body 'hello', got '%s'", w.Body.String())
 	}
 }

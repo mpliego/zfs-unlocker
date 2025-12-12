@@ -98,11 +98,12 @@ Based on the config above, this will attempt to fetch the secret from Vault at:
 
 **Response (Success 200)**
 
-*   **Raw Text**: If the secret contains a field named `value`, `key`, or `password`, the API returns just the content of that field as plain text. This is designed for direct consumption by `zfs load-key`.
+*   **Raw Binary**: The server assumes that the secret stored in Vault is a **Base64 encoded string**. It automatically decodes this value and returns the raw binary bytes. This makes it compatible with `keyformat=raw`.
 *   **JSON**: If no standard key field is found, it falls back to returning the full secret JSON object.
 
-```text
-MySuperSecretPassword
+```bash
+# Fetch raw key (server decodes Base64 from Vault automatically)
+zfs load-key -L "https://zfs-unlocker/unlock/key/vol" pool/dataset
 ```
 
 **Response (Pending)**

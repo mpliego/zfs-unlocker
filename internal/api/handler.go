@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net"
@@ -142,9 +143,18 @@ func (h *Handler) handleUnlock(c *gin.Context) {
 				return
 			}
 
-			// ZFS Compatibility: Return raw text found in standard fields
+			// ZFS Compatibility: The key in Vault is always Base64 encoded.
+			// We decode it and return the raw bytes.
 			if val, ok := secret["key"]; ok {
-				c.String(http.StatusOK, fmt.Sprintf("%v", val))
+				strVal := fmt.Sprintf("%v", val)
+
+				decoded, err := base64.StdEncoding.DecodeString(strVal)
+				if err != nil {
+					log.Printf("Failed to decode base64 key for %s: %v", c.Param("apiKey"), err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode key"})
+					return
+				}
+				c.Data(http.StatusOK, "application/octet-stream", decoded)
 				return
 			}
 
