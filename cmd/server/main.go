@@ -28,7 +28,7 @@ func main() {
 	configPath := flag.String("config", "config.yaml", "Path to configuration file")
 	flag.Parse()
 
-	if *versionFlag || *vFlag {
+	if *versionFlag || *vFlag || (len(flag.Args()) > 0 && flag.Args()[0] == "version") {
 		fmt.Printf("zfs-unlocker %s\n", version)
 		os.Exit(0)
 	}
